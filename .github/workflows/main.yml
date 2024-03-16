@@ -5,13 +5,16 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write  # Allows this workflow to push back to the repo
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
       with:
-        fetch-depth: 0  # Ensures history is available for version tags, required for version commands
+        fetch-depth: 0  # Fetches all history for all tags and branches
 
     - name: Use Node.js 18.x
       uses: actions/setup-node@v2
