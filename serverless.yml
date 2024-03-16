@@ -11,7 +11,7 @@
 #
 # Happy Coding!
 
-service: products-api
+service: template-service-aws-lambda-typescript
 # app and org for use with dashboard.serverless.com
 #app: your-app-name
 #org: your-org-name
@@ -48,12 +48,19 @@ provider:
       statements:
         - Effect: Allow
           Action:
-            - "dynamodb:PutItem"
-            - "dynamodb:GetItem"
-            - "dynamodb:DeleteItem"
-            - "dynamodb:Scan"
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:DescribeTable
           Resource:
             - { "Fn::GetAtt": ["ProductsTable", "Arn"] }
+            # ? TO add more tables
+            # - { "Fn::GetAtt": ["OrdersTable", "Arn"] }
+            # - { "Fn::GetAtt": ["CustomersTable", "Arn"] }
 
 # you can define service wide environment variables here
 #  environment:
@@ -154,6 +161,7 @@ plugins:
 #     NewOutput:
 #       Description: "Description for the output"
 #       Value: "Some output value"
+
 resources:
   Resources:
     ProductsTable:
@@ -169,3 +177,27 @@ resources:
         KeySchema:
           - AttributeName: productID
             KeyType: HASH
+
+      #? TO add more tables 
+      # OrdersTable:
+      #   Type: AWS::DynamoDB::Table
+      #   Properties:
+      #     TableName: OrdersTable
+      #     BillingMode: PAY_PER_REQUEST
+      #     AttributeDefinitions:
+      #       - AttributeName: orderID
+      #         AttributeType: S
+      #     KeySchema:
+      #       - AttributeName: orderID
+      #         KeyType: HASH
+      # CustomersTable:
+      #   Type: AWS::DynamoDB::Table
+      #   Properties:
+      #     TableName: CustomersTable
+      #     BillingMode: PAY_PER_REQUEST
+      #     AttributeDefinitions:
+      #       - AttributeName: customerID
+      #         AttributeType: S
+      #     KeySchema:
+      #       - AttributeName: customerID
+      #         KeyType: HASH
