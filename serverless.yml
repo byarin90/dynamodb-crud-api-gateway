@@ -23,7 +23,7 @@ frameworkVersion: "3"
 provider:
   name: aws
   runtime: nodejs18.x
-  #! lambdaHashingVersion: 20201221
+  lambdaHashingVersion: 20201221
   # stage: dev
   region: eu-central-1
 
@@ -56,10 +56,9 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
             - dynamodb:DescribeTable
-          Resource: "arn:aws:dynamodb:eu-central-1:*:table/*"
-
-            # ? TO add tables
-            # - { "Fn::GetAtt": ["ProductsTable", "Arn"] }
+          Resource:
+            - { "Fn::GetAtt": ["ProductsTable", "Arn"] }
+            # ? TO add more tables
             # - { "Fn::GetAtt": ["OrdersTable", "Arn"] }
             # - { "Fn::GetAtt": ["CustomersTable", "Arn"] }
 
