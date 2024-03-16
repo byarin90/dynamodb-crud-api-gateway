@@ -18,6 +18,7 @@ const schema = yup.object().shape({
 
 export const createProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
+    console.log("event", event);
     const reqBody = JSON.parse(event.body as string);
 
     await schema.validate(reqBody, { abortEarly: false });
