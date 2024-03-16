@@ -56,9 +56,10 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
             - dynamodb:DescribeTable
-          Resource:
-            - { "Fn::GetAtt": ["ProductsTable", "Arn"] }
-            # ? TO add more tables
+          Resource: "arn:aws:dynamodb:eu-central-1:*:table/*"
+
+            # ? TO add tables
+            # - { "Fn::GetAtt": ["ProductsTable", "Arn"] }
             # - { "Fn::GetAtt": ["OrdersTable", "Arn"] }
             # - { "Fn::GetAtt": ["CustomersTable", "Arn"] }
 
