@@ -8,7 +8,7 @@
     "dev": "sls offline --httpPort 5555",
     "start": "sls offline --httpPort 5555",
     "deploy": "serverless deploy",
-    "deploy:verbose": "serverless deploy --verbose"  
+    "deploy:verbose": "serverless deploy --verbose"
   },
   "author": "",
   "license": "ISC",
