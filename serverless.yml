@@ -23,7 +23,7 @@ frameworkVersion: "3"
 provider:
   name: aws
   runtime: nodejs18.x
-  # lambdaHashingVersion: 20201221
+  lambdaHashingVersion: 20201221
   # stage: dev
   region: eu-central-1
 
@@ -48,17 +48,13 @@ provider:
       statements:
         - Effect: Allow
           Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:BatchWriteItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
-            - dynamodb:DescribeTable
+            - "dynamodb:PutItem"
+            - "dynamodb:GetItem"
+            - "dynamodb:DeleteItem"
+            - "dynamodb:Scan"
           Resource:
             - { "Fn::GetAtt": ["ProductsTable", "Arn"] }
-            # ? TO add more tables
+          # ?   TO add more tables
             # - { "Fn::GetAtt": ["OrdersTable", "Arn"] }
             # - { "Fn::GetAtt": ["CustomersTable", "Arn"] }
 
@@ -161,7 +157,6 @@ plugins:
 #     NewOutput:
 #       Description: "Description for the output"
 #       Value: "Some output value"
-
 resources:
   Resources:
     ProductsTable:
@@ -178,7 +173,8 @@ resources:
           - AttributeName: productID
             KeyType: HASH
 
-      #? TO add more tables 
+
+          #? TO add more tables 
       # OrdersTable:
       #   Type: AWS::DynamoDB::Table
       #   Properties:
