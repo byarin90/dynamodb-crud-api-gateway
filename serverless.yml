@@ -26,32 +26,32 @@ provider:
   region: eu-central-1
 
   # you can add statements to the Lambda function's IAM Role here
-  #  iamRoleStatements:
-  #    - Effect: "Allow"
-  #      Action:
-  #        - "s3:ListBucket"
-  #      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
-  #    - Effect: "Allow"
-  #      Action:
-  #        - "s3:PutObject"
-  #      Resource:
-  #        Fn::Join:
-  #          - ""
-  #          - - "arn:aws:s3:::"
-  #            - "Ref" : "ServerlessDeploymentBucket"
-  #            - "/*"
+  # iamRoleStatements:
+  #   - Effect: "Allow"
+  #     Action:
+  #       - "s3:ListBucket"
+  #     Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
+  #   - Effect: "Allow"
+  #     Action:
+  #       - "s3:PutObject"
+  #     Resource:
+  #       Fn::Join:
+  #         - ""
+  #         - - "arn:aws:s3:::"
+  #           - "Ref" : "ServerlessDeploymentBucket"
+  #           - "/*"
 
   iam:
     role:
       statements:
-        - Effect: Allow
+        - Effect: "Allow"
           Action:
             - "dynamodb:PutItem"
             - "dynamodb:GetItem"
             - "dynamodb:DeleteItem"
             - "dynamodb:Scan"
-          Resource:
-            - { "Fn::GetAtt": ["ProductsTable", "Arn"] }
+          # Corrected to match the table name indicated in the error message
+          Resource: "arn:aws:dynamodb:eu-central-1:168935981053:table/productTable"
           
 # you can define service wide environment variables here
 #  environment:
@@ -155,10 +155,10 @@ plugins:
 #       Value: "Some output value"
 resources:
   Resources:
-    ProductsTable:
+    ProductsTable: # Consider renaming this to ProductTable to match the table name
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ProductsTable
+        TableName: productTable # Corrected to the actual table name
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
           - AttributeName: PK
