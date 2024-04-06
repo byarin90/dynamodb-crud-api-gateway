@@ -1,15 +1,34 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import AWS from "aws-sdk";
-import { v4 } from "uuid";
+import { v4 as uuidv4 } from 'uuid';
 import * as yup from "yup";
+import createDynamoClient from "./lib/dynamoDB/create-dynamo-client";
+import { logger } from "./lib/logger";
 
-const docClient = new AWS.DynamoDB.DocumentClient();
-const tableName = "ProductsTable";
-const headers = {
-  "content-type": "application/json",
+const tableName = "productTable";
+const headers = { "content-type": "application/json" };
+
+const dynamoClient = createDynamoClient();
+class HttpError extends Error {
+  constructor(public statusCode: number, public message: string) {
+    super(message);
+  }
+}
+
+const handleError = (error: unknown): APIGatewayProxyResult => {
+  if (error instanceof yup.ValidationError) {
+    return { statusCode: 400, headers, body: JSON.stringify({ errors: error.errors }) };
+  } else if (error instanceof HttpError) {
+    return { statusCode: error.statusCode, headers, body: JSON.stringify({ error: error.message }) };
+  } else if (error instanceof SyntaxError) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid request body format: ${error.message}` }) };
+  } else {
+    console.error(error);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: "Internal server error" }) };
+  }
 };
 
-const schema = yup.object().shape({
+
+const productSchema = yup.object().shape({
   name: yup.string().required(),
   description: yup.string().required(),
   price: yup.number().required(),
@@ -18,166 +37,79 @@ const schema = yup.object().shape({
 
 export const createProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    console.log("event", event);
-    const reqBody = JSON.parse(event.body as string);
+    const reqBody = JSON.parse(event.body || '{}');
+    await productSchema.validate(reqBody);
 
-    await schema.validate(reqBody, { abortEarly: false });
-
-    const product = {
+    const productID = uuidv4();
+    const item = {
+      PK: `PRODUCT#${productID}`,
+      SK: `METADATA#${productID}`,
       ...reqBody,
-      productID: v4(),
     };
-
-    await docClient
-      .put({
-        TableName: tableName,
-        Item: product,
-      })
-      .promise();
-
-    return {
-      statusCode: 201,
-      headers,
-      body: JSON.stringify(product),
-    };
-  } catch (e) {
-    return handleError(e);
+    logger.info('item', item)
+    await dynamoClient.put({ TableName: tableName, Item: item });
+    return { statusCode: 201, headers, body: JSON.stringify(item) };
+    // return { statusCode: 201, body: JSON.stringify({ message: 'Product created' }) };
+  } catch (error) {
+    return handleError(error);
   }
 };
-
-class HttpError extends Error {
-  constructor(public statusCode: number, body: Record<string, unknown> = {}) {
-    super(JSON.stringify(body));
-  }
-}
-
-const fetchProductById = async (id: string) => {
-  const output = await docClient
-    .get({
-      TableName: tableName,
-      Key: {
-        productID: id,
-      },
-    })
-    .promise();
-
-  if (!output.Item) {
-    throw new HttpError(404, { error: "not found" });
-  }
-
-  return output.Item;
-};
-
-const handleError = (e: unknown) => {
-  if (e instanceof yup.ValidationError) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({
-        errors: e.errors,
-      }),
-    };
-  }
-
-  if (e instanceof SyntaxError) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: `invalid request body format : "${e.message}"` }),
-    };
-  }
-
-  if (e instanceof HttpError) {
-    return {
-      statusCode: e.statusCode,
-      headers,
-      body: e.message,
-    };
-  }
-
-  throw e;
-};
-
 export const getProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    const product = await fetchProductById(event.pathParameters?.id as string);
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(product),
-    };
-  } catch (e) {
-    return handleError(e);
+    const { id } = event.pathParameters || {};
+    if (!id) throw new HttpError(400, "Product ID is required");
+
+    const PK = `PRODUCT#${id}`;
+    const SK = `METADATA#${id}`;
+
+    const { Item } = await dynamoClient.get({ TableName: tableName, Key: { PK, SK } });
+    if (!Item) throw new HttpError(404, "Product not found");
+
+    return { statusCode: 200, headers, body: JSON.stringify(Item) };
+  } catch (error) {
+    return handleError(error);
   }
 };
+
 
 export const updateProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    const id = event.pathParameters?.id as string;
+    const { id } = event.pathParameters || {};
+    const reqBody = JSON.parse(event.body || '{}');
+    await productSchema.validate(reqBody);
 
-    await fetchProductById(id);
+    const PK = `PRODUCT#${id}`;
+    const SK = `METADATA#${id}`;
 
-    const reqBody = JSON.parse(event.body as string);
+    const existingProduct = await dynamoClient.get({ TableName: tableName, Key: { PK, SK } });
+    if (!existingProduct.Item) throw new HttpError(404, "Product not found");
 
-    await schema.validate(reqBody, { abortEarly: false });
-
-    const product = {
+    const updatedItem = {
+      ...existingProduct.Item,
       ...reqBody,
-      productID: id,
     };
 
-    await docClient
-      .put({
-        TableName: tableName,
-        Item: product,
-      })
-      .promise();
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(product),
-    };
-  } catch (e) {
-    return handleError(e);
+    await dynamoClient.put({ TableName: tableName, Item: updatedItem });
+    return { statusCode: 200, headers, body: JSON.stringify(updatedItem) };
+  } catch (error) {
+    return handleError(error);
   }
 };
+
+
 
 export const deleteProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    const id = event.pathParameters?.id as string;
+    const { id } = event.pathParameters || {};
+    if (!id) throw new HttpError(400, "Product ID is required");
 
-    await fetchProductById(id);
+    const PK = `PRODUCT#${id}`;
+    const SK = `METADATA#${id}`;
 
-    await docClient
-      .delete({
-        TableName: tableName,
-        Key: {
-          productID: id,
-        },
-      })
-      .promise();
-
-    return {
-      statusCode: 204,
-      body: "",
-    };
-  } catch (e) {
-    return handleError(e);
+    await dynamoClient.delete({ TableName: tableName, Key: { PK, SK } });
+    return { statusCode: 204, headers, body: "" };
+  } catch (error) {
+    return handleError(error);
   }
-};
-
-export const listProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  const output = await docClient
-    .scan({
-      TableName: tableName,
-    })
-    .promise();
-
-  return {
-    statusCode: 200,
-    headers,
-    body: JSON.stringify(output.Items),
-  };
 };

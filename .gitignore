@@ -1,1 +1,7 @@
 node_modules
+.env
+docker
+docker-compose.yml
+build
+DynamoDB_Commands_Guide.txt
+RDS_in_DynamoDB_Guide.txt

@@ -23,8 +23,6 @@ frameworkVersion: "3"
 provider:
   name: aws
   runtime: nodejs18.x
-  # lambdaHashingVersion: 20201221
-  # stage: dev
   region: eu-central-1
 
   # you can add statements to the Lambda function's IAM Role here
@@ -142,6 +140,7 @@ functions:
 plugins:
   - serverless-plugin-typescript
   - serverless-offline
+  - serverless-iam-roles-per-function
 
 # you can add CloudFormation resource templates here
 #resources:
@@ -160,12 +159,14 @@ resources:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: ProductsTable
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+        BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
-          - AttributeName: productID
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
             AttributeType: S
         KeySchema:
-          - AttributeName: productID
+          - AttributeName: PK
             KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
