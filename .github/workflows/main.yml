@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write  # Allows this workflow to push back to the repo
+  contents: write  # Allows this workflow to push back to the repo.
 
 jobs:
   deploy:
