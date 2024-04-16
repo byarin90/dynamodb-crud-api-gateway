@@ -1,115 +1,165 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { v4 as uuidv4 } from 'uuid';
-import * as yup from "yup";
+import Joi from 'joi';
 import createDynamoClient from "./lib/dynamoDB/create-dynamo-client";
 import { logger } from "./lib/logger";
+import sendResponse from "./lib/serverless/send-response";
+import { StandardError, transformError } from "./lib/serverless/error-handling";
+import getRequestFromEvent from "./lib/serverless/get-request";
 
-const tableName = "productTable";
-const headers = { "content-type": "application/json" };
+const tableName = process.env.PRODUCT_TABLE_NAME || "productTable";
 
 const dynamoClient = createDynamoClient();
-class HttpError extends Error {
-  constructor(public statusCode: number, public message: string) {
-    super(message);
-  }
-}
-
-const handleError = (error: unknown): APIGatewayProxyResult => {
-  if (error instanceof yup.ValidationError) {
-    return { statusCode: 400, headers, body: JSON.stringify({ errors: error.errors }) };
-  } else if (error instanceof HttpError) {
-    return { statusCode: error.statusCode, headers, body: JSON.stringify({ error: error.message }) };
-  } else if (error instanceof SyntaxError) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid request body format: ${error.message}` }) };
-  } else {
-    console.error(error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: "Internal server error" }) };
-  }
-};
 
 
-const productSchema = yup.object().shape({
-  name: yup.string().required(),
-  description: yup.string().required(),
-  price: yup.number().required(),
-  available: yup.bool().required(),
+
+const productSchema = Joi.object({
+  name: Joi.string().required(),
+  description: Joi.string().required(),
+  price: Joi.number().required(),
+  available: Joi.boolean().required(),
 });
 
-export const createProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+
+
+export const createProduct = async (event: APIGatewayProxyEvent): Promise<unknown> => {
   try {
-    const reqBody = JSON.parse(event.body || '{}');
-    await productSchema.validate(reqBody);
+    const {
+      body,
+    } = getRequestFromEvent(event);
+
+    const validatedBody = await productSchema.validateAsync(body);
 
     const productID = uuidv4();
     const item = {
-      PK: `PRODUCT#${productID}`,
-      SK: `METADATA#${productID}`,
-      ...reqBody,
+      PK: `PRODUCT`,
+      SK: `PRODUCT#${productID}`,
+      ...validatedBody,
     };
-    logger.info('item', item)
+    logger.info('Creating item', { item });
     await dynamoClient.put({ TableName: tableName, Item: item });
-    return { statusCode: 201, headers, body: JSON.stringify(item) };
-    // return { statusCode: 201, body: JSON.stringify({ message: 'Product created' }) };
+    return sendResponse(201, item);
   } catch (error) {
-    return handleError(error);
-  }
-};
-export const getProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  try {
+    const e = transformError(error)
 
-    const { id } = event.pathParameters || {};
-    if (!id) throw new HttpError(400, "Product ID is required");
+    logger.error(e.message, { type: e.type, stack: e.stack })
 
-    const PK = `PRODUCT#${id}`;
-    const SK = `METADATA#${id}`;
-
-    const { Item } = await dynamoClient.get({ TableName: tableName, Key: { PK, SK } });
-    if (!Item) throw new HttpError(404, "Product not found");
-
-    return { statusCode: 200, headers, body: JSON.stringify(Item) };
-  } catch (error) {
-    return handleError(error);
-  }
+    return await sendResponse(e.statusCode, {
+      type: e.type,
+      message: e.message,
+    })    }
 };
 
-
-export const updateProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const getProduct = async (event: APIGatewayProxyEvent): Promise<unknown> => {
   try {
-    const { id } = event.pathParameters || {};
-    const reqBody = JSON.parse(event.body || '{}');
-    await productSchema.validate(reqBody);
+    const {
+      params: { id },
+    } = getRequestFromEvent(event);
 
-    const PK = `PRODUCT#${id}`;
-    const SK = `METADATA#${id}`;
+    if (!id) throw new StandardError('Product ID is required','CLIENT_ERROR',400)
 
-    const existingProduct = await dynamoClient.get({ TableName: tableName, Key: { PK, SK } });
-    if (!existingProduct.Item) throw new HttpError(404, "Product not found");
-
-    const updatedItem = {
-      ...existingProduct.Item,
-      ...reqBody,
+    const key = {
+      PK: `PRODUCT`,
+      SK: `PRODUCT#${id}`,
     };
+    logger.info('Retrieving product', { key });
+    const { Item } = await dynamoClient.get({ TableName: tableName, Key: key });
+    if (!Item) throw new StandardError('Product not found','CLIENT_ERROR',404);
 
-    await dynamoClient.put({ TableName: tableName, Item: updatedItem });
-    return { statusCode: 200, headers, body: JSON.stringify(updatedItem) };
+    return sendResponse(200, Item);
   } catch (error) {
-    return handleError(error);
-  }
+    const e = transformError(error)
+
+    logger.error(e.message, { type: e.type, stack: e.stack })
+
+    return await sendResponse(e.statusCode, {
+      type: e.type,
+      message: e.message,
+    })    }
 };
 
-
-
-export const deleteProduct = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const updateProduct = async (event: APIGatewayProxyEvent): Promise<unknown> => {
   try {
-    const { id } = event.pathParameters || {};
-    if (!id) throw new HttpError(400, "Product ID is required");
+    const {
+      params: { id },
+      body
+    } = getRequestFromEvent(event);
 
-    const PK = `PRODUCT#${id}`;
-    const SK = `METADATA#${id}`;
+    const validatedBody = await productSchema.validateAsync(body);
 
-    await dynamoClient.delete({ TableName: tableName, Key: { PK, SK } });
-    return { statusCode: 204, headers, body: "" };
+    const key = {
+      PK: `PRODUCT`,
+      SK: `PRODUCT#${id}`,
+    };
+    logger.info('Updating product', { key });
+    const { Item } = await dynamoClient.get({ TableName: tableName, Key: key });
+    if (!Item) throw new StandardError('Product not found','CLIENT_ERROR',404);
+
+    const updatedItem = { ...Item, ...validatedBody };
+    await dynamoClient.put({ TableName: tableName, Item: updatedItem });
+    return sendResponse(200, updatedItem);
   } catch (error) {
-    return handleError(error);
+    const e = transformError(error)
+
+    logger.error(e.message, { type: e.type, stack: e.stack })
+
+    return await sendResponse(e.statusCode, {
+      type: e.type,
+      message: e.message,
+    })    }
+};
+
+export const deleteProduct = async (event: APIGatewayProxyEvent): Promise<unknown> => {
+  try {
+    const {
+      params: { id },
+    } = getRequestFromEvent(event);
+    
+    if (!id) throw new StandardError('Product ID is required','CLIENT_ERROR',400)
+
+    const key = {
+      PK: `PRODUCT`,
+      SK: `PRODUCT#${id}`,
+    };
+    logger.info('Deleting product', { key });
+    await dynamoClient.delete({ TableName: tableName, Key: key });
+    return sendResponse(204, {});
+  } catch (error) {
+    const e = transformError(error)
+
+    logger.error(e.message, { type: e.type, stack: e.stack })
+
+    return await sendResponse(e.statusCode, {
+      type: e.type,
+      message: e.message,
+    })    }
+};
+
+
+export const getProducts = async (event: APIGatewayProxyEvent): Promise<unknown> => {
+  try {
+    const { Items } = await dynamoClient.query({
+      TableName: tableName,
+      KeyConditionExpression: 'PK = :pk',
+      ExpressionAttributeValues: {
+        ':pk': 'PRODUCT'
+      }
+    });
+
+    if(!Items) throw new StandardError('No products found','CLIENT_ERROR',404);
+
+    logger.info('Fetched products', { count: Items.length });
+    return sendResponse(200, Items);
+  } catch (error) {
+    const e = transformError(error)
+
+    logger.error(e.message, { type: e.type, stack: e.stack })
+
+    return await sendResponse(e.statusCode, {
+      type: e.type,
+      message: e.message,
+    })  
+  
   }
 };
+

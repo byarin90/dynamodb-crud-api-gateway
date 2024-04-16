@@ -1,139 +1,144 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteProduct = exports.updateProduct = exports.getProduct = exports.createProduct = void 0;
+exports.getProducts = exports.deleteProduct = exports.updateProduct = exports.getProduct = exports.createProduct = void 0;
 const uuid_1 = require("uuid");
-const yup = __importStar(require("yup"));
+const joi_1 = __importDefault(require("joi"));
 const create_dynamo_client_1 = __importDefault(require("./lib/dynamoDB/create-dynamo-client"));
 const logger_1 = require("./lib/logger");
-const tableName = "productTable";
-const headers = { "content-type": "application/json" };
+const send_response_1 = __importDefault(require("./lib/serverless/send-response"));
+const error_handling_1 = require("./lib/serverless/error-handling");
+const get_request_1 = __importDefault(require("./lib/serverless/get-request"));
+const tableName = process.env.PRODUCT_TABLE_NAME || "productTable";
 const dynamoClient = (0, create_dynamo_client_1.default)();
-class HttpError extends Error {
-    constructor(statusCode, message) {
-        super(message);
-        this.statusCode = statusCode;
-        this.message = message;
-    }
-}
-const handleError = (error) => {
-    if (error instanceof yup.ValidationError) {
-        return { statusCode: 400, headers, body: JSON.stringify({ errors: error.errors }) };
-    }
-    else if (error instanceof HttpError) {
-        return { statusCode: error.statusCode, headers, body: JSON.stringify({ error: error.message }) };
-    }
-    else if (error instanceof SyntaxError) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid request body format: ${error.message}` }) };
-    }
-    else {
-        console.error(error);
-        return { statusCode: 500, headers, body: JSON.stringify({ error: "Internal server error" }) };
-    }
-};
-const productSchema = yup.object().shape({
-    name: yup.string().required(),
-    description: yup.string().required(),
-    price: yup.number().required(),
-    available: yup.bool().required(),
+const productSchema = joi_1.default.object({
+    name: joi_1.default.string().required(),
+    description: joi_1.default.string().required(),
+    price: joi_1.default.number().required(),
+    available: joi_1.default.boolean().required(),
 });
 const createProduct = async (event) => {
     try {
-        const reqBody = JSON.parse(event.body || '{}');
-        await productSchema.validate(reqBody);
+        const { body, } = (0, get_request_1.default)(event);
+        const validatedBody = await productSchema.validateAsync(body);
         const productID = (0, uuid_1.v4)();
         const item = {
-            PK: `PRODUCT#${productID}`,
-            SK: `METADATA#${productID}`,
-            ...reqBody,
+            PK: `PRODUCT`,
+            SK: `PRODUCT#${productID}`,
+            ...validatedBody,
         };
-        logger_1.logger.info('item', item);
+        logger_1.logger.info('Creating item', { item });
         await dynamoClient.put({ TableName: tableName, Item: item });
-        return { statusCode: 201, headers, body: JSON.stringify(item) };
-        // return { statusCode: 201, body: JSON.stringify({ message: 'Product created' }) };
+        return (0, send_response_1.default)(201, item);
     }
     catch (error) {
-        return handleError(error);
+        const e = (0, error_handling_1.transformError)(error);
+        logger_1.logger.error(e.message, { type: e.type, stack: e.stack });
+        return await (0, send_response_1.default)(e.statusCode, {
+            type: e.type,
+            message: e.message,
+        });
     }
 };
 exports.createProduct = createProduct;
 const getProduct = async (event) => {
     try {
-        const { id } = event.pathParameters || {};
+        const { params: { id }, } = (0, get_request_1.default)(event);
         if (!id)
-            throw new HttpError(400, "Product ID is required");
-        const PK = `PRODUCT#${id}`;
-        const SK = `METADATA#${id}`;
-        const { Item } = await dynamoClient.get({ TableName: tableName, Key: { PK, SK } });
+            throw new error_handling_1.StandardError('Product ID is required', 'CLIENT_ERROR', 400);
+        const key = {
+            PK: `PRODUCT`,
+            SK: `PRODUCT#${id}`,
+        };
+        logger_1.logger.info('Retrieving product', { key });
+        const { Item } = await dynamoClient.get({ TableName: tableName, Key: key });
         if (!Item)
-            throw new HttpError(404, "Product not found");
-        return { statusCode: 200, headers, body: JSON.stringify(Item) };
+            throw new error_handling_1.StandardError('Product not found', 'CLIENT_ERROR', 404);
+        return (0, send_response_1.default)(200, Item);
     }
     catch (error) {
-        return handleError(error);
+        const e = (0, error_handling_1.transformError)(error);
+        logger_1.logger.error(e.message, { type: e.type, stack: e.stack });
+        return await (0, send_response_1.default)(e.statusCode, {
+            type: e.type,
+            message: e.message,
+        });
     }
 };
 exports.getProduct = getProduct;
 const updateProduct = async (event) => {
     try {
-        const { id } = event.pathParameters || {};
-        const reqBody = JSON.parse(event.body || '{}');
-        await productSchema.validate(reqBody);
-        const PK = `PRODUCT#${id}`;
-        const SK = `METADATA#${id}`;
-        const existingProduct = await dynamoClient.get({ TableName: tableName, Key: { PK, SK } });
-        if (!existingProduct.Item)
-            throw new HttpError(404, "Product not found");
-        const updatedItem = {
-            ...existingProduct.Item,
-            ...reqBody,
+        const { params: { id }, body } = (0, get_request_1.default)(event);
+        const validatedBody = await productSchema.validateAsync(body);
+        const key = {
+            PK: `PRODUCT`,
+            SK: `PRODUCT#${id}`,
         };
+        logger_1.logger.info('Updating product', { key });
+        const { Item } = await dynamoClient.get({ TableName: tableName, Key: key });
+        if (!Item)
+            throw new error_handling_1.StandardError('Product not found', 'CLIENT_ERROR', 404);
+        const updatedItem = { ...Item, ...validatedBody };
         await dynamoClient.put({ TableName: tableName, Item: updatedItem });
-        return { statusCode: 200, headers, body: JSON.stringify(updatedItem) };
+        return (0, send_response_1.default)(200, updatedItem);
     }
     catch (error) {
-        return handleError(error);
+        const e = (0, error_handling_1.transformError)(error);
+        logger_1.logger.error(e.message, { type: e.type, stack: e.stack });
+        return await (0, send_response_1.default)(e.statusCode, {
+            type: e.type,
+            message: e.message,
+        });
     }
 };
 exports.updateProduct = updateProduct;
 const deleteProduct = async (event) => {
     try {
-        const { id } = event.pathParameters || {};
+        const { params: { id }, } = (0, get_request_1.default)(event);
         if (!id)
-            throw new HttpError(400, "Product ID is required");
-        const PK = `PRODUCT#${id}`;
-        const SK = `METADATA#${id}`;
-        await dynamoClient.delete({ TableName: tableName, Key: { PK, SK } });
-        return { statusCode: 204, headers, body: "" };
+            throw new error_handling_1.StandardError('Product ID is required', 'CLIENT_ERROR', 400);
+        const key = {
+            PK: `PRODUCT`,
+            SK: `PRODUCT#${id}`,
+        };
+        logger_1.logger.info('Deleting product', { key });
+        await dynamoClient.delete({ TableName: tableName, Key: key });
+        return (0, send_response_1.default)(204, {});
     }
     catch (error) {
-        return handleError(error);
+        const e = (0, error_handling_1.transformError)(error);
+        logger_1.logger.error(e.message, { type: e.type, stack: e.stack });
+        return await (0, send_response_1.default)(e.statusCode, {
+            type: e.type,
+            message: e.message,
+        });
     }
 };
 exports.deleteProduct = deleteProduct;
+const getProducts = async (event) => {
+    try {
+        const { Items } = await dynamoClient.query({
+            TableName: tableName,
+            KeyConditionExpression: 'PK = :pk',
+            ExpressionAttributeValues: {
+                ':pk': 'PRODUCT'
+            }
+        });
+        if (!Items)
+            throw new error_handling_1.StandardError('No products found', 'CLIENT_ERROR', 404);
+        logger_1.logger.info('Fetched products', { count: Items.length });
+        return (0, send_response_1.default)(200, Items);
+    }
+    catch (error) {
+        const e = (0, error_handling_1.transformError)(error);
+        logger_1.logger.error(e.message, { type: e.type, stack: e.stack });
+        return await (0, send_response_1.default)(e.statusCode, {
+            type: e.type,
+            message: e.message,
+        });
+    }
+};
+exports.getProducts = getProducts;
 //# sourceMappingURL=handlers.js.map

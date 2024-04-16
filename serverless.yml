@@ -24,13 +24,17 @@ provider:
   name: aws
   runtime: nodejs18.x
   region: eu-central-1
-  httpApi:
-    authorizers:
-      auth0Authorizer:
-        identitySource: $request.header.Authorization
-        issuerUrl: https://${env:AUTH0_TENET_DOMAIN, 'https://yarin-bukai.eu.auth0.com/'}/
-        audience:
-        - ${env:AUTH0_API_IDENTIFIER, 'https://vxztk1yx12.execute-api.eu-central-1.amazonaws.com'}
+  tracing:
+    lambda: true
+    apiGateway: true
+
+  # httpApi:
+  #   authorizers:
+  #     auth0Authorizer:
+  #       identitySource: $request.header.Authorization
+  #       issuerUrl: https://${env:AUTH0_TENET_DOMAIN, 'https://yarin-bukai.eu.auth0.com/'}/
+  #       audience:
+  #       - ${env:AUTH0_API_IDENTIFIER, 'https://vxztk1yx12.execute-api.eu-central-1.amazonaws.com'}
 
 
   # you can add statements to the Lambda function's IAM Role here
@@ -74,14 +78,21 @@ provider:
 #    - include-me-dir/**
 
 functions:
+  healthz:
+    handler: src/handlers.healthz
+    timeout: 30
+    events:
+      - httpApi:
+          path: /healthz
+          method: get
   createProduct:
     handler: src/handlers.createProduct
     events:
       - httpApi:
           path: /product
           method: post
-          authorizer:
-            name: auth0Authorizer
+          # authorizer:
+          #   name: auth0Authorizer
   getProduct:
     handler: src/handlers.getProduct
     events:
@@ -100,8 +111,8 @@ functions:
       - httpApi:
           path: /product/{id}
           method: delete
-  listProduct:
-    handler: src/handlers.listProduct
+  getProducts:
+    handler: src/handlers.getProducts
     events:
       - httpApi:
           path: /products
