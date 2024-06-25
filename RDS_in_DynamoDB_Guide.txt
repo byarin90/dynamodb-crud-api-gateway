@@ -1,0 +1,83 @@
+
+# Modeling RDS-like Relational Data in DynamoDB
+
+DynamoDB, a NoSQL database, is designed for high scalability, performance, and flexibility. It's possible to model relational data (similar to RDS) in DynamoDB by leveraging its features such as composite primary keys (partition and sort keys) and secondary indexes. This guide provides an overview of how to model entities like users and products within a single DynamoDB table.
+
+## Single Table Design
+
+A single table design in DynamoDB involves storing multiple entity types in a single table, differentiated by their keys. This approach optimizes for performance and scalability.
+
+### Key Concepts
+
+- **Partition Key (PK)**: Uniquely identifies the data category or entity type (e.g., User, Product).
+- **Sort Key (SK)**: Provides additional sorting and querying capabilities within each category.
+
+### Advantages
+
+- Efficient use of I/O operations.
+- Simplifies querying related data.
+- Reduces the number of tables, which can minimize overhead and complexity.
+
+## Example: Users and Products in One Table
+
+### Table Structure
+
+- **Table Name**: `AppData`
+- **Primary Key**: Composite of `PK` (Partition Key) and `SK` (Sort Key).
+
+### Items
+
+- **User**: 
+  - `PK: USER#<UserId>`
+  - `SK: PROFILE#<UserId>`
+  - Attributes: `name`, `email`, etc.
+  
+- **Product**:
+  - `PK: PRODUCT#<ProductId>`
+  - `SK: DETAILS#<ProductId>`
+  - Attributes: `title`, `description`, `price`, etc.
+
+### Operations
+
+#### Adding a User
+
+```shell
+aws dynamodb put-item --table-name AppData --item '{
+  "PK": {"S": "USER#123"},
+  "SK": {"S": "PROFILE#123"},
+  "name": {"S": "Jane Doe"},
+  "email": {"S": "jane@example.com"}
+}'
+```
+
+#### Adding a Product
+
+```shell
+aws dynamodb put-item --table-name AppData --item '{
+  "PK": {"S": "PRODUCT#456"},
+  "SK": {"S": "DETAILS#456"},
+  "title": {"S": "Laptop"},
+  "description": {"S": "A high-performance laptop."},
+  "price": {"N": "999"}
+}'
+```
+
+#### Querying a User's Profile
+
+```shell
+aws dynamodb query --table-name AppData --key-condition-expression "PK = :pk AND SK = :sk" --expression-attribute-values '{
+  ":pk": {"S": "USER#123"},
+  ":sk": {"S": "PROFILE#123"}
+}'
+```
+
+#### Querying Product Details
+
+```shell
+aws dynamodb query --table-name AppData --key-condition-expression "PK = :pk AND SK = :sk" --expression-attribute-values '{
+  ":pk": {"S": "PRODUCT#456"},
+  ":sk": {"S": "DETAILS#456"}
+}'
+```
+
+This guide provides a basic overview of modeling relational data in DynamoDB. The single table design is a powerful pattern for leveraging DynamoDB's strengths while accommodating relational-like data modeling.

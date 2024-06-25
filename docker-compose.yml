@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  dynamodb-local:
+    container_name: dynamodb-yb
+    image: amazon/dynamodb-local
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /data"
+    volumes:
+      - /Users/yarinbukai/Documents/YB/development/aws/docker/dynamoDb:/data
+    ports:
+      - "8002:8000"

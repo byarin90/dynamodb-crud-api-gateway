@@ -27,15 +27,18 @@ provider:
   tracing:
     lambda: true
     apiGateway: true
+  environment:
+    AUTH0_TENET_DOMAIN: 'https://yarin-bukai.eu.auth0.com/'
+    AUTH0_API_IDENTIFIER: 'https://vxztk1yx12.execute-api.eu-central-1.amazonaws.com'
+  configValidationMode: error
 
-  # httpApi:
-  #   authorizers:
-  #     auth0Authorizer:
-  #       identitySource: $request.header.Authorization
-  #       issuerUrl: https://${env:AUTH0_TENET_DOMAIN, 'https://yarin-bukai.eu.auth0.com/'}/
-  #       audience:
-  #       - ${env:AUTH0_API_IDENTIFIER, 'https://vxztk1yx12.execute-api.eu-central-1.amazonaws.com'}
-
+httpApi:
+  authorizers:
+    auth0Authorizer:
+      identitySource: $request.header.Authorization
+      issuerUrl: https://${env:AUTH0_TENET_DOMAIN, 'https://yarin-bukai.eu.auth0.com/'}
+      audience:
+        - ${env:AUTH0_API_IDENTIFIER, 'https://vxztk1yx12.execute-api.eu-central-1.amazonaws.com'}
 
   # you can add statements to the Lambda function's IAM Role here
   # iamRoleStatements:
@@ -79,7 +82,7 @@ provider:
 
 functions:
   healthz:
-    handler: src/handlers.healthz
+    handler: src/handlers.healthCheck
     timeout: 30
     events:
       - httpApi:
@@ -117,6 +120,8 @@ functions:
       - httpApi:
           path: /products
           method: get
+          # authorizer:
+          #   name: auth0Authorizer
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
@@ -162,6 +167,10 @@ plugins:
   - serverless-plugin-typescript
   - serverless-offline
   - serverless-iam-roles-per-function
+  - serverless-dotenv-plugin
+  - serverless-plugin-common-excludes
+  - serverless-domain-manager
+  - serverless-prune-plugin
 
 # you can add CloudFormation resource templates here
 #resources:

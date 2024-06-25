@@ -12,7 +12,9 @@ const tableName = process.env.PRODUCT_TABLE_NAME || "productTable";
 const dynamoClient = createDynamoClient();
 
 
-
+export const healthCheck = async (): Promise<unknown> => {
+  return sendResponse(200, { message: 'Service is up and running' });
+}
 const productSchema = Joi.object({
   name: Joi.string().required(),
   description: Joi.string().required(),
@@ -47,7 +49,8 @@ export const createProduct = async (event: APIGatewayProxyEvent): Promise<unknow
     return await sendResponse(e.statusCode, {
       type: e.type,
       message: e.message,
-    })    }
+    })
+  }
 };
 
 export const getProduct = async (event: APIGatewayProxyEvent): Promise<unknown> => {
@@ -56,7 +59,7 @@ export const getProduct = async (event: APIGatewayProxyEvent): Promise<unknown> 
       params: { id },
     } = getRequestFromEvent(event);
 
-    if (!id) throw new StandardError('Product ID is required','CLIENT_ERROR',400)
+    if (!id) throw new StandardError('Product ID is required', 'CLIENT_ERROR', 400)
 
     const key = {
       PK: `PRODUCT`,
@@ -64,7 +67,7 @@ export const getProduct = async (event: APIGatewayProxyEvent): Promise<unknown> 
     };
     logger.info('Retrieving product', { key });
     const { Item } = await dynamoClient.get({ TableName: tableName, Key: key });
-    if (!Item) throw new StandardError('Product not found','CLIENT_ERROR',404);
+    if (!Item) throw new StandardError('Product not found', 'CLIENT_ERROR', 404);
 
     return sendResponse(200, Item);
   } catch (error) {
@@ -75,7 +78,8 @@ export const getProduct = async (event: APIGatewayProxyEvent): Promise<unknown> 
     return await sendResponse(e.statusCode, {
       type: e.type,
       message: e.message,
-    })    }
+    })
+  }
 };
 
 export const updateProduct = async (event: APIGatewayProxyEvent): Promise<unknown> => {
@@ -93,7 +97,7 @@ export const updateProduct = async (event: APIGatewayProxyEvent): Promise<unknow
     };
     logger.info('Updating product', { key });
     const { Item } = await dynamoClient.get({ TableName: tableName, Key: key });
-    if (!Item) throw new StandardError('Product not found','CLIENT_ERROR',404);
+    if (!Item) throw new StandardError('Product not found', 'CLIENT_ERROR', 404);
 
     const updatedItem = { ...Item, ...validatedBody };
     await dynamoClient.put({ TableName: tableName, Item: updatedItem });
@@ -106,7 +110,8 @@ export const updateProduct = async (event: APIGatewayProxyEvent): Promise<unknow
     return await sendResponse(e.statusCode, {
       type: e.type,
       message: e.message,
-    })    }
+    })
+  }
 };
 
 export const deleteProduct = async (event: APIGatewayProxyEvent): Promise<unknown> => {
@@ -114,8 +119,8 @@ export const deleteProduct = async (event: APIGatewayProxyEvent): Promise<unknow
     const {
       params: { id },
     } = getRequestFromEvent(event);
-    
-    if (!id) throw new StandardError('Product ID is required','CLIENT_ERROR',400)
+
+    if (!id) throw new StandardError('Product ID is required', 'CLIENT_ERROR', 400)
 
     const key = {
       PK: `PRODUCT`,
@@ -132,7 +137,8 @@ export const deleteProduct = async (event: APIGatewayProxyEvent): Promise<unknow
     return await sendResponse(e.statusCode, {
       type: e.type,
       message: e.message,
-    })    }
+    })
+  }
 };
 
 
@@ -146,7 +152,7 @@ export const getProducts = async (event: APIGatewayProxyEvent): Promise<unknown>
       }
     });
 
-    if(!Items) throw new StandardError('No products found','CLIENT_ERROR',404);
+    if (!Items) throw new StandardError('No products found', 'CLIENT_ERROR', 404);
 
     logger.info('Fetched products', { count: Items.length });
     return sendResponse(200, Items);
@@ -158,8 +164,8 @@ export const getProducts = async (event: APIGatewayProxyEvent): Promise<unknown>
     return await sendResponse(e.statusCode, {
       type: e.type,
       message: e.message,
-    })  
-  
+    })
+
   }
 };
 

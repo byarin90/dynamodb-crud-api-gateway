@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getProducts = exports.deleteProduct = exports.updateProduct = exports.getProduct = exports.createProduct = void 0;
+exports.getProducts = exports.deleteProduct = exports.updateProduct = exports.getProduct = exports.createProduct = exports.healthCheck = void 0;
 const uuid_1 = require("uuid");
 const joi_1 = __importDefault(require("joi"));
 const create_dynamo_client_1 = __importDefault(require("./lib/dynamoDB/create-dynamo-client"));
@@ -13,6 +13,10 @@ const error_handling_1 = require("./lib/serverless/error-handling");
 const get_request_1 = __importDefault(require("./lib/serverless/get-request"));
 const tableName = process.env.PRODUCT_TABLE_NAME || "productTable";
 const dynamoClient = (0, create_dynamo_client_1.default)();
+const healthCheck = async () => {
+    return (0, send_response_1.default)(200, { message: 'Service is up and running' });
+};
+exports.healthCheck = healthCheck;
 const productSchema = joi_1.default.object({
     name: joi_1.default.string().required(),
     description: joi_1.default.string().required(),
