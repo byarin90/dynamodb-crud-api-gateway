@@ -30,15 +30,6 @@ provider:
   environment:
     AUTH0_TENET_DOMAIN: 'https://yarin-bukai.eu.auth0.com/'
     AUTH0_API_IDENTIFIER: 'https://vxztk1yx12.execute-api.eu-central-1.amazonaws.com'
-  configValidationMode: error
-
-httpApi:
-  authorizers:
-    auth0Authorizer:
-      identitySource: $request.header.Authorization
-      issuerUrl: https://${env:AUTH0_TENET_DOMAIN, 'https://yarin-bukai.eu.auth0.com/'}
-      audience:
-        - ${env:AUTH0_API_IDENTIFIER, 'https://vxztk1yx12.execute-api.eu-central-1.amazonaws.com'}
 
   # you can add statements to the Lambda function's IAM Role here
   # iamRoleStatements:
@@ -83,7 +74,6 @@ httpApi:
 functions:
   healthz:
     handler: src/handlers.healthCheck
-    timeout: 30
     events:
       - httpApi:
           path: /healthz
@@ -94,8 +84,6 @@ functions:
       - httpApi:
           path: /product
           method: post
-          # authorizer:
-          #   name: auth0Authorizer
   getProduct:
     handler: src/handlers.getProduct
     events:
@@ -120,65 +108,10 @@ functions:
       - httpApi:
           path: /products
           method: get
-          # authorizer:
-          #   name: auth0Authorizer
-
-#    The following are a few example events you can configure
-#    NOTE: Please make sure to change your handler code to work with those events
-#    Check the event documentation for details
-#    events:
-#      - httpApi:
-#          path: /users/create
-#          method: get
-#      - websocket: $connect
-#      - s3: ${env:BUCKET}
-#      - schedule: rate(10 minutes)
-#      - sns: greeter-topic
-#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
-#      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
-#      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
-#      - iot:
-#          sql: "SELECT * FROM 'some_topic'"
-#      - cloudwatchEvent:
-#          event:
-#            source:
-#              - "aws.ec2"
-#            detail-type:
-#              - "EC2 Instance State-change Notification"
-#            detail:
-#              state:
-#                - pending
-#      - cloudwatchLog: '/aws/lambda/hello'
-#      - cognitoUserPool:
-#          pool: MyUserPool
-#          trigger: PreSignUp
-#      - alb:
-#          listenerArn: arn:aws:elasticloadbalancing:us-east-1:XXXXXX:listener/app/my-load-balancer/50dc6c495c0c9188/
-#          priority: 1
-#          conditions:
-#            host: example.com
-#            path: /hello
-
-#    Define function environment variables here
-#    environment:
-#      variable2: value2
-
 plugins:
   - serverless-offline
   - serverless-iam-roles-per-function
   - serverless-plugin-common-excludes
-
-# you can add CloudFormation resource templates here
-# resources:
-#  Resources:
-#    NewResource:
-#      Type: AWS::S3::Bucket
-#      Properties:
-#        BucketName: my-new-bucket
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
 
 resources:
   Resources:
